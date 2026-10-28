@@ -39,14 +39,19 @@ def ask():
             json={'contents': [{'parts': [{'text': prompt}]}], 'generationConfig': {'temperature': 0.2}},
             timeout=45)
         if not response.ok:
-            app.logger.warning('Gemini API HTTP %s', response.status_code)
-            return jsonify(answer='Yapay zekâ servisine ulaşılamadı. API anahtarı, model ve kota ayarlarını kontrol edin.'), 502
+            try:
+                error = response.json().get('error', {})
+                error_message = error.get('message', 'Bilinmeyen API hatası')
+            except (ValueError, AttributeError):
+                error_message = 'Google API hata yanıtı okunamadı.'
+            app.logger.warning('Gemini API HTTP %s: %s', response.status_code, error_message[:1000])
+            return jsonify(answer='Gemini API hatası: ' + error_message[:500]), 502
         payload = response.json()
         answer = '\n'.join(p.get('text', '') for c in payload.get('candidates', []) for p in c.get('content', {}).get('parts', []) if p.get('text'))
         return jsonify(answer=(answer or 'Model yanıt üretemedi.') + '\n\nNot: Güncel mevzuatı resmî kaynaklardan teyit edin.')
     except requests.RequestException:
-        return jsonify(answer='Yapay zekâ bağlantısı zaman aşımına uğradı. Tekrar deneyin.'), 504
+        app.logger.exception('Gemini bağlantı hatası')
+        return jsonify(answer='Yapay zekâ bağlantısı zaman aşımına uğradı veya bağlantı kurulamadı. Tekrar deneyin.'), 504
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', '10000')))
-
