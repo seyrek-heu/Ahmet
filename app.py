@@ -1,156 +1,52 @@
-
-
+import os
+import requests
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
-
 SOURCES = {
-    "Vergi Mevzuatı": [
-        ("Gelir İdaresi Başkanlığı", "https://www.gib.gov.tr"),
-        ("Mevzuat Bilgi Sistemi", "https://www.mevzuat.gov.tr")
-    ],
-    "Türk Ticaret Kanunu": [
-        ("Mevzuat Bilgi Sistemi", "https://www.mevzuat.gov.tr")
-    ],
-    "SPK Mevzuatı": [
-        ("Sermaye Piyasası Kurulu", "https://spk.gov.tr")
-    ],
-    "Türkiye Muhasebe Standartları": [
-        ("Kamu Gözetimi Kurumu", "https://www.kgk.gov.tr")
-    ],
-    "Mali Takvim": [
-        ("GİB Vergi Takvimi", "https://www.gib.gov.tr"),
-        ("SGK", "https://www.sgk.gov.tr")
-    ]
+    'Vergi Mevzuatı': [('Gelir İdaresi Başkanlığı', 'https://www.gib.gov.tr'), ('Mevzuat Bilgi Sistemi', 'https://www.mevzuat.gov.tr')],
+    'Türk Ticaret Kanunu': [('Mevzuat Bilgi Sistemi', 'https://www.mevzuat.gov.tr')],
+    'SPK Mevzuatı': [('Sermaye Piyasası Kurulu', 'https://spk.gov.tr')],
+    'Türkiye Muhasebe Standartları': [('Kamu Gözetimi Kurumu', 'https://www.kgk.gov.tr')],
 }
+HTML = '''<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mali Mevzuat AI</title><style>body{font-family:system-ui;background:#101827;color:#f7f9ff;margin:0;padding:24px}main{max-width:680px;margin:auto}section{background:#1e3049;padding:24px;border-radius:18px;margin:20px 0}h1{font-size:30px}select,textarea,button{box-sizing:border-box;width:100%;padding:15px;border-radius:10px;font-size:17px;margin:10px 0}select,textarea{background:#101827;color:white;border:1px solid #62758e}textarea{min-height:130px}button{background:#2784ea;color:white;border:0;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.55}a{color:#8ec7ff}small{color:#bdc9d8}</style></head><body><main><h1>Mali Mevzuat AI</h1><small>Vergi · TTK · SPK · TMS</small><section><h2>Mevzuat Asistanı</h2><select id="category">{% for category in sources %}<option>{{category}}</option>{% endfor %}</select><textarea id="question" placeholder="Mevzuat sorunuzu yazın"></textarea><button id="send" onclick="ask()">Soruyu Gönder</button><pre id="answer" aria-live="polite"></pre></section><section><h2>Resmî Kaynaklar</h2>{% for category,links in sources.items() %}<h3>{{category}}</h3>{% for name,url in links %}<p><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{name}}</a></p>{% endfor %}{% endfor %}</section></main><script>async function ask(){const b=document.getElementById('send'),a=document.getElementById('answer');b.disabled=true;a.textContent='Yanıt hazırlanıyor...';try{const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:document.getElementById('category').value,question:document.getElementById('question').value})});const j=await r.json();a.textContent=j.answer||'Yanıt alınamadı.'}catch(e){a.textContent='Bağlantı hatası. Tekrar deneyin.'}finally{b.disabled=false}}</script></body></html>'''
 
-HTML = """
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mali Mevzuat AI</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;background:#101827;color:#fff;
-font-family:Arial,sans-serif}
-header{padding:25px 18px;text-align:center;
-background:#17243a}
-h1{margin:0;font-size:28px}
-header p{color:#b7c7dd}
-main{max-width:750px;margin:auto;padding:18px}
-section{background:#1d2b42;border-radius:14px;
-padding:18px;margin-bottom:18px}
-h2{font-size:19px;margin-top:0}
-textarea{width:100%;height:115px;padding:13px;
-background:#101827;color:white;
-border:1px solid #60728c;border-radius:9px;
-font-size:16px}
-button{width:100%;background:#2984ed;color:white;
-padding:14px;border:0;border-radius:9px;
-font-size:16px;margin-top:12px}
-select{width:100%;padding:12px;margin-bottom:12px;
-background:#101827;color:white;
-border:1px solid #60728c;border-radius:9px}
-a{color:#80bdff;display:block;padding:9px 0}
-#result{white-space:pre-wrap;line-height:1.6;
-margin-top:15px}
-small{color:#b7c7dd}
-</style>
-</head>
-<body>
-<header>
-<h1>Mali Mevzuat AI</h1>
-<p>Vergi • TTK • SPK • TMS</p>
-</header>
-<main>
-<section>
-<h2>Mevzuat Asistanı</h2>
-<select id="category">
-{% for name in sources %}
-<option value="{{name}}">{{name}}</option>
-{% endfor %}
-</select>
-<textarea id="question"
-placeholder="Mevzuat sorunuzu buraya yazın..."></textarea>
-<button onclick="ask()">Soruyu Gönder</button>
-<div id="result" aria-live="polite"></div>
-</section>
-<section>
-<h2>Resmî Mevzuat Kaynakları</h2>
-{% for name, links in sources.items() %}
-<h3>{{name}}</h3>
-{% for label, url in links %}
-<a href="{{url}}" target="_blank"
-rel="noopener noreferrer">{{label}}</a>
-{% endfor %}
-{% endfor %}
-</section>
-<section>
-<h2>Mali Takvim</h2>
-<p>Vergi ve SGK takvimlerini yukarıdaki
-resmî bağlantılardan kontrol edebilirsiniz.</p>
-<small>Otomatik tarih güncellemesi henüz aktif değil.</small>
-</section>
-</main>
-<script>
-async function ask(){
-const q=document.getElementById("question").value.trim();
-const c=document.getElementById("category").value;
-const out=document.getElementById("result");
-if(!q){out.textContent="Lütfen sorunuzu yazın.";return;}
-out.textContent="Kaynak bilgileri hazırlanıyor...";
-try{
-const response=await fetch("/api/ask",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({question:q,category:c})
-});
-const data=await response.json();
-out.textContent=data.answer || "Yanıt alınamadı.";
-}catch(e){
-out.textContent="Bağlantı hatası oluştu.";
-}
-}
-</script>
-</body>
-</html>
-"""
-
-@app.route("/")
+@app.get('/')
 def home():
     return render_template_string(HTML, sources=SOURCES)
 
-@app.route("/api/ask", methods=["POST"])
+@app.post('/api/ask')
 def ask():
     data = request.get_json(silent=True) or {}
-    question = str(data.get("question", "")).strip()
-    category = str(data.get("category", "Vergi Mevzuatı"))
-
+    question = str(data.get('question', '')).strip()
+    category = str(data.get('category', 'Vergi Mevzuatı'))
     if not question:
-        return jsonify({"answer": "Lütfen soru yazın."}), 400
+        return jsonify(answer='Lütfen sorunuzu yazın.'), 400
+    if len(question) > 4000 or category not in SOURCES:
+        return jsonify(answer='Geçersiz kategori veya çok uzun soru.'), 400
+    key = os.environ.get('GEMINI_API_KEY', '').strip()
+    if not key:
+        return jsonify(answer='Gemini API anahtarı Render ortam değişkenlerinde tanımlanmamış.'), 503
+    model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+    prompt = (f'Sen Türkiye mali mevzuat asistanısın. Konu: {category}. '
+              'Türkçe, dikkatli ve açık yanıt ver. Kanun maddelerini veya güncel oranları uydurma. '
+              'Canlı mevzuat erişimin olmadığını ve güncelliğin doğrulanması gerektiğini gerektiğinde belirt. '
+              'Kaynak bağlantılarını yalnızca doğruluğundan eminsen ver. Sorunun içeriği:\n' + question)
+    try:
+        response = requests.post(
+            f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+            headers={'x-goog-api-key': key, 'Content-Type': 'application/json'},
+            json={'contents': [{'parts': [{'text': prompt}]}], 'generationConfig': {'temperature': 0.2}},
+            timeout=45)
+        if not response.ok:
+            app.logger.warning('Gemini API HTTP %s', response.status_code)
+            return jsonify(answer='Yapay zekâ servisine ulaşılamadı. API anahtarı, model ve kota ayarlarını kontrol edin.'), 502
+        payload = response.json()
+        answer = '\n'.join(p.get('text', '') for c in payload.get('candidates', []) for p in c.get('content', {}).get('parts', []) if p.get('text'))
+        return jsonify(answer=(answer or 'Model yanıt üretemedi.') + '\n\nNot: Güncel mevzuatı resmî kaynaklardan teyit edin.')
+    except requests.RequestException:
+        return jsonify(answer='Yapay zekâ bağlantısı zaman aşımına uğradı. Tekrar deneyin.'), 504
 
-    if category not in SOURCES:
-        return jsonify({"answer": "Geçersiz kategori."}), 400
-
-    links = "\n".join(
-        f"{name}: {url}" for name, url in SOURCES[category]
-    )
-
-    return jsonify({
-        "answer": (
-            "Sorunuz alındı:\n" + question +
-            "\n\nBu sürüm henüz yapay zekâ yanıtı üretmiyor."
-            "\n\nİlgili resmî kaynaklar:\n" + links +
-            "\n\nMevzuatın güncel metnini kontrol edin."
-        )
-    })
-
-if __name__ == "__main__":
-    import os
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 10000))
-    )
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', '10000')))
 
