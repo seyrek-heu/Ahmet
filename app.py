@@ -8,7 +8,7 @@ from flask import Flask, jsonify, render_template_string, request
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
-VERSION = '3.6'
+VERSION = '3.7'
 KDV_OFFICIAL = 'https://gib.gov.tr/mevzuat/kanun/436'
 SOURCES = {
     'Vergi Mevzuatı': [('GİB - KDV Kanunu', KDV_OFFICIAL), ('Mevzuat Bilgi Sistemi', 'https://www.mevzuat.gov.tr')],
@@ -16,7 +16,7 @@ SOURCES = {
     'SPK Mevzuatı': [('Sermaye Piyasası Kurulu', 'https://spk.gov.tr')],
     'Türkiye Muhasebe Standartları': [('Kamu Gözetimi Kurumu', 'https://www.kgk.gov.tr')],
 }
-HTML = '''<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mali Mevzuat AI {{version}}</title><style>body{font-family:system-ui;background:#101827;color:#f7f9ff;margin:0;padding:20px}main{max-width:750px;margin:auto}section{background:#1e3049;padding:22px;border-radius:18px;margin:18px 0}h1{font-size:29px}select,textarea,button{box-sizing:border-box;width:100%;padding:14px;border-radius:10px;font-size:16px;margin:9px 0}select,textarea{background:#101827;color:white;border:1px solid #62758e}textarea{min-height:125px}button{background:#2784ea;color:white;border:0;cursor:pointer}button:disabled{opacity:.6}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.55}a{color:#8ec7ff}small{color:#bdc9d8}details{margin:18px 0}#diagnostics{font-size:13px}</style></head><body><main><h1>Mali Mevzuat AI {{version}}</h1><small>Vergi · TTK · SPK · TMS | Kaynak kontrolü</small><section><h2>Mevzuat Asistanı</h2><select id="category">{% for category in sources %}<option>{{category}}</option>{% endfor %}</select><textarea id="question" placeholder="Örnek: 3065 sayılı KDV Kanunu 29/3 nedir?"></textarea><button id="send" onclick="ask()">Resmî Kaynakta Ara ve Yanıtla</button><pre id="answer" aria-live="polite"></pre><div id="links"></div><details><summary>Kaynak tanılama bilgileri</summary><pre id="diagnostics">Henüz sorgu yapılmadı.</pre></details><button onclick="navigator.clipboard.writeText(document.getElementById('answer').textContent)">Yanıtı Kopyala</button></section><section><h2>Resmî Kaynaklar</h2>{% for category,links in sources.items() %}<h3>{{category}}</h3>{% for name,url in links %}<p><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{name}}</a></p>{% endfor %}{% endfor %}</section></main><script>async function ask(){const b=document.getElementById('send'),a=document.getElementById('answer'),l=document.getElementById('links');b.disabled=true;a.textContent='Resmî kaynak kontrol ediliyor...';l.replaceChildren();document.getElementById('diagnostics').textContent='Kontrol sürüyor...';try{const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:document.getElementById('category').value,question:document.getElementById('question').value})});const j=await r.json();a.textContent=j.answer||'Yanıt alınamadı.';document.getElementById('diagnostics').textContent=JSON.stringify(j.diagnostics||{status:j.status||'bilinmiyor'},null,2);if(j.source_url){const p=document.createElement('p'),link=document.createElement('a');link.href=j.source_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Kontrol edilen kaynak: '+j.source_url;p.appendChild(link);l.appendChild(p)}}catch(e){a.textContent='Bağlantı hatası. Tekrar deneyin.'}finally{b.disabled=false}}</script></body></html>'''
+HTML = '''<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mali Mevzuat AI {{version}}</title><style>body{font-family:system-ui;background:#101827;color:#f7f9ff;margin:0;padding:20px}main{max-width:750px;margin:auto}section{background:#1e3049;padding:22px;border-radius:18px;margin:18px 0}h1{font-size:29px}select,textarea,button{box-sizing:border-box;width:100%;padding:14px;border-radius:10px;font-size:16px;margin:9px 0}select,textarea{background:#101827;color:white;border:1px solid #62758e}textarea{min-height:125px}button{background:#2784ea;color:white;border:0;cursor:pointer}button:disabled{opacity:.6}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.55}a{color:#8ec7ff}small{color:#bdc9d8}details{margin:18px 0}#diagnostics{font-size:13px}</style></head><body><main><h1>Mali Mevzuat AI {{version}}</h1><small>Vergi · TTK · SPK · TMS | Kaynak kontrolü</small><section><h2>Mevzuat Asistanı</h2><select id="category">{% for category in sources %}<option>{{category}}</option>{% endfor %}</select><textarea id="question" placeholder="Örnek: 3065 sayılı KDV Kanunu 29/3 nedir?"></textarea><details><summary>Resmî metni elle yapıştır (otomatik okuma başarısızsa)</summary><p><small>GİB sayfasında gördüğünüz 29. maddenin tamamını buraya kopyalayın. Bu metin sunucu tarafından doğrulanmış sayılmaz.</small></p><textarea id="manual_text" placeholder="Madde 29 ..."></textarea></details><button id="send" onclick="ask()">Resmî Kaynakta Ara ve Yanıtla</button><pre id="answer" aria-live="polite"></pre><div id="links"></div><details><summary>Kaynak tanılama bilgileri</summary><pre id="diagnostics">Henüz sorgu yapılmadı.</pre></details><button onclick="navigator.clipboard.writeText(document.getElementById('answer').textContent)">Yanıtı Kopyala</button></section><section><h2>Resmî Kaynaklar</h2>{% for category,links in sources.items() %}<h3>{{category}}</h3>{% for name,url in links %}<p><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{name}}</a></p>{% endfor %}{% endfor %}</section></main><script>async function ask(){const b=document.getElementById('send'),a=document.getElementById('answer'),l=document.getElementById('links');b.disabled=true;a.textContent='Resmî kaynak kontrol ediliyor...';l.replaceChildren();document.getElementById('diagnostics').textContent='Kontrol sürüyor...';try{const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:document.getElementById('category').value,question:document.getElementById('question').value,manual_text:document.getElementById('manual_text').value})});const j=await r.json();a.textContent=j.answer||'Yanıt alınamadı.';document.getElementById('diagnostics').textContent=JSON.stringify(j.diagnostics||{status:j.status||'bilinmiyor'},null,2);if(j.source_url){const p=document.createElement('p'),link=document.createElement('a');link.href=j.source_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Kontrol edilen kaynak: '+j.source_url;p.appendChild(link);l.appendChild(p)}}catch(e){a.textContent='Bağlantı hatası. Tekrar deneyin.'}finally{b.disabled=false}}</script></body></html>'''
 
 @app.get('/')
 def home():
@@ -143,7 +143,22 @@ def ask():
     if not question or len(question) > 4000 or category not in SOURCES:
         return jsonify(answer='Geçerli bir kategori seçip 1–4000 karakterlik soru yazın.'), 400
     article = requested_article(question) if category == 'Vergi Mevzuatı' else None
-    source_text, source_url, diagnostics = official_article(article) if article else (None, None, {'result': 'article_not_supported'})
+    manual_text = str(data.get('manual_text', '')).strip()
+    if len(manual_text) > 40000:
+        return jsonify(answer='Yapıştırılan metin 40.000 karakteri aşamaz.'), 400
+    manual_mode = bool(manual_text)
+    if manual_mode:
+        if not article:
+            return jsonify(answer='Elle metin kullanmak için soruda KDV 29 veya 30. maddeyi belirtin.'), 400
+        # User-provided text is NEVER marked as independently verified.
+        if not re.search(r'(?i)\bmadde\s*' + str(article) + r'\b', manual_text) or len(manual_text) < 120:
+            return jsonify(answer='Yapıştırılan metinde ilgili madde başlığı bulunamadı veya metin çok kısa.'), 400
+        if article == 29 and not re.search(r'(?<!\d)3\s*[.\-)]', manual_text):
+            return jsonify(answer='29/3 fıkrası metinde tespit edilemedi. Maddeyi eksiksiz yapıştırın.'), 400
+        source_text, source_url = manual_text, KDV_OFFICIAL
+        diagnostics = {'result': 'user_supplied_unverified', 'article': article, 'characters': len(manual_text)}
+    else:
+        source_text, source_url, diagnostics = official_article(article) if article else (None, None, {'result': 'article_not_supported'})
     app.logger.info('GIB source diagnostics: %s', diagnostics)
     if article and not source_text:
         return jsonify(answer='RESMÎ METİN DOĞRULANAMADI\n\nGİB yanıtları incelendi ancak ilgili kanun maddesi güvenilir biçimde çıkarılamadı. Tanılama bölümünde ham yanıt boyutu, sayfa başlığı ve bağlantı bilgilerini kontrol edin.', source_url=source_url, verified_source=False, status='unverified', diagnostics=diagnostics)
@@ -153,7 +168,7 @@ def ask():
     model = os.environ.get('GEMINI_MODEL', 'gemini-3.1-flash-lite').strip()
     if not re.fullmatch(r'[A-Za-z0-9_.-]+', model):
         return jsonify(answer='Geçersiz model ayarı.'), 500
-    grounding = (f'GİB sitesinden bu istek sırasında alınan metin (yürürlük/güncellik ayrıca doğrulanmadı):\n{source_text}\nKaynak: {source_url}\nYalnızca bu metinle desteklenen hükümleri doğrulanmış olarak açıkla.' if source_text else 'Canlı resmî madde metni doğrulanmadı. Güncel oran, tarih ve madde içeriği hakkında doğrulama iddiasında bulunma; genel bilgi vereceksen açıkça doğrulanmamış olduğunu belirt.')
+    grounding = (f'KULLANICININ YAPIŞTIRDIĞI DOĞRULANMAMIŞ METİN (resmî kaynaktan otomatik doğrulanmadı):\n{source_text}\nYalnızca bu metne göre açıkla; resmî kaynak kontrolü yapıldığını iddia etme.' if manual_mode else f'GİB sitesinden bu istek sırasında alınan metin (yürürlük/güncellik ayrıca doğrulanmadı):\n{source_text}\nKaynak: {source_url}\nYalnızca bu metinle desteklenen hükümleri doğrulanmış olarak açıkla.' if source_text else 'Canlı resmî madde metni doğrulanmadı. Güncel oran, tarih ve madde içeriği hakkında doğrulama iddiasında bulunma; genel bilgi vereceksen açıkça doğrulanmamış olduğunu belirt.')
     prompt = f'Sen Türkiye mali mevzuat asistanısın. Kategori: {category}. Türkçe ve ihtiyatlı yanıt ver. Doğrulanmamış hükümleri uydurma.\n{grounding}\nKULLANICI SORUSU:\n{question}'
     try:
         response = requests.post(f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent', headers={'x-goog-api-key': key, 'Content-Type': 'application/json'}, json={'contents': [{'parts': [{'text': prompt}]}], 'generationConfig': {'temperature': 0.1}}, timeout=(8, 45))
@@ -165,8 +180,8 @@ def ask():
             return jsonify(answer='Gemini API hatası: ' + str(message)[:300]), 502
         payload = response.json()
         answer = '\n'.join(p.get('text', '') for c in payload.get('candidates', []) for p in c.get('content', {}).get('parts', []) if p.get('text'))
-        suffix = ('\n\nKaynak kontrolü: GİB kaynağından madde metni çıkarıldı; yürürlükteki son sürüm olduğu ayrıca doğrulanmadı.' if source_text else '\n\nKaynak kontrolü: Bu yanıt için canlı madde metni doğrulanmadı.')
-        return jsonify(answer=(answer or 'Model yanıt üretemedi.') + suffix, source_url=source_url, verified_source=bool(source_text), status='source_fetched' if source_text else 'unverified', diagnostics=diagnostics)
+        suffix = ('\n\nKaynak kontrolü: Kullanıcı tarafından yapıştırılan metin kullanıldı; resmî kaynak ve güncellik otomatik doğrulanmadı.' if manual_mode else '\n\nKaynak kontrolü: GİB kaynağından madde metni çıkarıldı; yürürlükteki son sürüm olduğu ayrıca doğrulanmadı.' if source_text else '\n\nKaynak kontrolü: Bu yanıt için canlı madde metni doğrulanmadı.')
+        return jsonify(answer=(answer or 'Model yanıt üretemedi.') + suffix, source_url=source_url, verified_source=bool(source_text) and not manual_mode, status='user_supplied_unverified' if manual_mode else 'source_fetched' if source_text else 'unverified', diagnostics=diagnostics)
     except requests.RequestException:
         app.logger.exception('Gemini bağlantı hatası')
         return jsonify(answer='Yapay zekâ bağlantısı zaman aşımına uğradı veya kurulamadı.'), 504
