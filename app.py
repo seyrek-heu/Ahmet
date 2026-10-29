@@ -11,7 +11,7 @@ from pypdf import PdfReader
 app = Flask(__name__)
 app.json.ensure_ascii = False
 
-VERSION = '3.3'
+VERSION = '3.4'
 KDV_OFFICIAL = 'https://gib.gov.tr/mevzuat/kanun/436'
 SOURCES = {
     'Vergi Mevzuatı': [('GİB - KDV Kanunu', KDV_OFFICIAL), ('Mevzuat Bilgi Sistemi', 'https://www.mevzuat.gov.tr')],
@@ -19,7 +19,7 @@ SOURCES = {
     'SPK Mevzuatı': [('Sermaye Piyasası Kurulu', 'https://spk.gov.tr')],
     'Türkiye Muhasebe Standartları': [('Kamu Gözetimi Kurumu', 'https://www.kgk.gov.tr')],
 }
-HTML = '''<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mali Mevzuat AI {{version}}</title><style>body{font-family:system-ui;background:#101827;color:#f7f9ff;margin:0;padding:20px}main{max-width:750px;margin:auto}section{background:#1e3049;padding:22px;border-radius:18px;margin:18px 0}h1{font-size:29px}select,textarea,button{box-sizing:border-box;width:100%;padding:14px;border-radius:10px;font-size:16px;margin:9px 0}select,textarea{background:#101827;color:white;border:1px solid #62758e}textarea{min-height:125px}button{background:#2784ea;color:white;border:0;cursor:pointer}button:disabled{opacity:.6}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.55}a{color:#8ec7ff}small{color:#bdc9d8}</style></head><body><main><h1>Mali Mevzuat AI {{version}}</h1><small>Vergi · TTK · SPK · TMS | Kaynak kontrolü</small><section><h2>Mevzuat Asistanı</h2><select id="category">{% for category in sources %}<option>{{category}}</option>{% endfor %}</select><textarea id="question" placeholder="Örnek: 3065 sayılı KDV Kanunu 29/3 nedir?"></textarea><button id="send" onclick="ask()">Resmî Kaynakta Ara ve Yanıtla</button><pre id="answer" aria-live="polite"></pre><div id="links"></div><button onclick="navigator.clipboard.writeText(document.getElementById('answer').textContent)">Yanıtı Kopyala</button></section><section><h2>Resmî Kaynaklar</h2>{% for category,links in sources.items() %}<h3>{{category}}</h3>{% for name,url in links %}<p><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{name}}</a></p>{% endfor %}{% endfor %}</section></main><script>async function ask(){const b=document.getElementById('send'),a=document.getElementById('answer'),l=document.getElementById('links');b.disabled=true;a.textContent='Resmî kaynak kontrol ediliyor...';l.replaceChildren();try{const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:document.getElementById('category').value,question:document.getElementById('question').value})});const j=await r.json();a.textContent=j.answer||'Yanıt alınamadı.';if(j.source_url){const p=document.createElement('p'),link=document.createElement('a');link.href=j.source_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Kontrol edilen kaynak: '+j.source_url;p.appendChild(link);l.appendChild(p)}}catch(e){a.textContent='Bağlantı hatası. Tekrar deneyin.'}finally{b.disabled=false}}</script></body></html>'''
+HTML = '''<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mali Mevzuat AI {{version}}</title><style>body{font-family:system-ui;background:#101827;color:#f7f9ff;margin:0;padding:20px}main{max-width:750px;margin:auto}section{background:#1e3049;padding:22px;border-radius:18px;margin:18px 0}h1{font-size:29px}select,textarea,button{box-sizing:border-box;width:100%;padding:14px;border-radius:10px;font-size:16px;margin:9px 0}select,textarea{background:#101827;color:white;border:1px solid #62758e}textarea{min-height:125px}button{background:#2784ea;color:white;border:0;cursor:pointer}button:disabled{opacity:.6}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.55}a{color:#8ec7ff}small{color:#bdc9d8}</style></head><body><main><h1>Mali Mevzuat AI {{version}}</h1><small>Vergi · TTK · SPK · TMS | Kaynak kontrolü</small><section><h2>Mevzuat Asistanı</h2><select id="category">{% for category in sources %}<option>{{category}}</option>{% endfor %}</select><textarea id="question" placeholder="Örnek: 3065 sayılı KDV Kanunu 29/3 nedir?"></textarea><button id="send" onclick="ask()">Resmî Kaynakta Ara ve Yanıtla</button><pre id="answer" aria-live="polite"></pre><div id="links"></div><details><summary>Kaynak tanılama bilgileri</summary><pre id="diagnostics">Henüz sorgu yapılmadı.</pre></details><button onclick="navigator.clipboard.writeText(document.getElementById('answer').textContent)">Yanıtı Kopyala</button></section><section><h2>Resmî Kaynaklar</h2>{% for category,links in sources.items() %}<h3>{{category}}</h3>{% for name,url in links %}<p><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{name}}</a></p>{% endfor %}{% endfor %}</section></main><script>async function ask(){const b=document.getElementById('send'),a=document.getElementById('answer'),l=document.getElementById('links');b.disabled=true;a.textContent='Resmî kaynak kontrol ediliyor...';l.replaceChildren();document.getElementById('diagnostics').textContent='Kontrol sürüyor...';try{const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:document.getElementById('category').value,question:document.getElementById('question').value})});const j=await r.json();a.textContent=j.answer||'Yanıt alınamadı.';document.getElementById('diagnostics').textContent=JSON.stringify(j.diagnostics||{status:j.status||'bilinmiyor'},null,2);if(j.source_url){const p=document.createElement('p'),link=document.createElement('a');link.href=j.source_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Kontrol edilen kaynak: '+j.source_url;p.appendChild(link);l.appendChild(p)}}catch(e){a.textContent='Bağlantı hatası. Tekrar deneyin.'}finally{b.disabled=false}}</script></body></html>'''
 
 @app.get('/')
 def home():
@@ -69,21 +69,22 @@ def extract_article(text, number):
 
 
 def official_article(number):
-    """Fetch bounded HTML/PDF from GIB only; failure is NOT proof of no law."""
+    """Return source, URL and bounded, non-sensitive diagnostics for a GIB lookup."""
+    diagnostic = {'article': number, 'html_status': None, 'html_characters': 0,
+                  'html_article_headings': 0, 'pdf_links': 0, 'pdf_checks': [],
+                  'result': 'not_found'}
     session = requests.Session()
-    session.headers.update({'User-Agent': 'Mozilla/5.0 (compatible; MaliMevzuatAI/3.3)'})
+    session.headers.update({'User-Agent': 'Mozilla/5.0 (compatible; MaliMevzuatAI/3.4)'})
     try:
-        r = session.get(KDV_OFFICIAL, timeout=(5, 12))
+        r = session.get(KDV_OFFICIAL, timeout=(5, 12), allow_redirects=True)
+        diagnostic['html_status'] = r.status_code
+        diagnostic['html_content_type'] = r.headers.get('Content-Type', '').split(';')[0][:60]
+        diagnostic['redirected'] = r.url != KDV_OFFICIAL
         r.raise_for_status()
         if len(r.content) > 4_000_000:
-            return None, KDV_OFFICIAL
+            diagnostic['result'] = 'html_too_large'
+            return None, KDV_OFFICIAL, diagnostic
         soup = BeautifulSoup(r.content, 'html.parser')
-        for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
-            tag.decompose()
-        found = extract_article(soup.get_text(' ', strip=True), number)
-        if found:
-            return found, r.url
-        # Some GIB law pages expose the actual text in a linked PDF.
         candidates = []
         for tag in soup.select('a[href], iframe[src], embed[src]'):
             href = tag.get('href') or tag.get('src') or ''
@@ -93,27 +94,49 @@ def official_article(number):
                 continue
             if '.pdf' in parsed.path.lower() and link not in candidates:
                 candidates.append(link)
+        diagnostic['pdf_links'] = len(candidates)
+        for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
+            tag.decompose()
+        text = soup.get_text(' ', strip=True)
+        diagnostic['html_characters'] = len(text)
+        diagnostic['html_article_headings'] = len(re.findall(r'(?<!\w)madde\s*' + str(number) + r'\b', text, re.I))
+        found = extract_article(text, number)
+        if found:
+            diagnostic['result'] = 'html_article_found'
+            return found, r.url, diagnostic
         for url in candidates[:3]:
+            entry = {'http_status': None, 'pages': 0, 'text_characters': 0, 'result': 'not_found'}
+            diagnostic['pdf_checks'].append(entry)
             try:
                 pdf = session.get(url, timeout=(5, 15))
+                entry['http_status'] = pdf.status_code
                 pdf.raise_for_status()
                 if not pdf.content.startswith(b'%PDF') or len(pdf.content) > 8_000_000:
+                    entry['result'] = 'not_pdf_or_too_large'
                     continue
                 reader = PdfReader(io.BytesIO(pdf.content), strict=False)
+                entry['pages'] = len(reader.pages)
                 if len(reader.pages) > 350:
+                    entry['result'] = 'too_many_pages'
                     continue
                 parts = []
                 for page in reader.pages:
                     parts.append(page.extract_text() or '')
-                found = extract_article(' '.join(parts), number)
+                pdf_text = ' '.join(parts)
+                entry['text_characters'] = len(pdf_text)
+                found = extract_article(pdf_text, number)
                 if found:
-                    return found, url
-            except (requests.RequestException, ValueError, Exception) as exc:
-                app.logger.info('PDF okunamadı: %s', type(exc).__name__)
-        return None, r.url
+                    entry['result'] = 'article_found'
+                    diagnostic['result'] = 'pdf_article_found'
+                    return found, url, diagnostic
+            except Exception as exc:
+                entry['result'] = 'read_error_' + type(exc).__name__
+                app.logger.warning('GIB PDF extraction: %s', type(exc).__name__)
+        return None, r.url, diagnostic
     except requests.RequestException as exc:
-        app.logger.warning('GIB erişimi başarısız: %s', type(exc).__name__)
-        return None, KDV_OFFICIAL
+        diagnostic['result'] = 'http_error_' + type(exc).__name__
+        app.logger.warning('GIB source fetch: %s', type(exc).__name__)
+        return None, KDV_OFFICIAL, diagnostic
 
 
 @app.post('/api/ask')
@@ -124,9 +147,10 @@ def ask():
     if not question or len(question) > 4000 or category not in SOURCES:
         return jsonify(answer='Geçerli bir kategori seçip 1–4000 karakterlik soru yazın.'), 400
     article = requested_article(question) if category == 'Vergi Mevzuatı' else None
-    source_text, source_url = official_article(article) if article else (None, None)
+    source_text, source_url, diagnostics = official_article(article) if article else (None, None, {'result': 'article_not_supported'})
+    app.logger.info('GIB article diagnostics: %s', diagnostics)
     if article and not source_text:
-        return jsonify(answer='RESMÎ METİN DOĞRULANAMADI\n\nGİB sayfası veya bağlı PDF içinden ilgili kanun maddesinin tam metni güvenilir biçimde çıkarılamadı. Bu nedenle madde hakkında tahmini cevap verilmedi. Kaynağı bağlantıdan manuel kontrol edin.', source_url=source_url, verified_source=False, status='unverified')
+        return jsonify(answer='RESMÎ METİN DOĞRULANAMADI\n\nGİB sayfası veya bağlı PDF içinden ilgili kanun maddesinin tam metni güvenilir biçimde çıkarılamadı. Bu nedenle madde hakkında tahmini cevap verilmedi. Kaynağı bağlantıdan manuel kontrol edin.', source_url=source_url, verified_source=False, status='unverified', diagnostics=diagnostics)
     key = os.environ.get('GEMINI_API_KEY', '').strip()
     if not key:
         return jsonify(answer='GEMINI_API_KEY tanımlanmamış.'), 503
@@ -147,7 +171,7 @@ def ask():
         payload = r.json()
         answer = '\n'.join(p.get('text', '') for c in payload.get('candidates', []) for p in c.get('content', {}).get('parts', []) if p.get('text'))
         suffix = ('\n\nKaynak kontrolü: GİB kaynağından madde metni çıkarıldı; yürürlükteki son sürüm olduğu ayrıca doğrulanmadı.' if source_text else '\n\nKaynak kontrolü: Bu yanıt için canlı madde metni doğrulanmadı.')
-        return jsonify(answer=(answer or 'Model yanıt üretemedi.') + suffix, source_url=source_url, verified_source=bool(source_text), status='source_fetched' if source_text else 'unverified')
+        return jsonify(answer=(answer or 'Model yanıt üretemedi.') + suffix, source_url=source_url, verified_source=bool(source_text), status='source_fetched' if source_text else 'unverified', diagnostics=diagnostics)
     except requests.RequestException:
         app.logger.exception('Gemini bağlantı hatası')
         return jsonify(answer='Yapay zekâ bağlantısı zaman aşımına uğradı veya kurulamadı.'), 504
