@@ -11,7 +11,7 @@ from pypdf import PdfReader
 app = Flask(__name__)
 app.json.ensure_ascii = False
 
-VERSION = '3.4'
+VERSION = '3.5'
 KDV_OFFICIAL = 'https://gib.gov.tr/mevzuat/kanun/436'
 SOURCES = {
     'Vergi Mevzuatı': [('GİB - KDV Kanunu', KDV_OFFICIAL), ('Mevzuat Bilgi Sistemi', 'https://www.mevzuat.gov.tr')],
@@ -69,74 +69,46 @@ def extract_article(text, number):
 
 
 def official_article(number):
-    """Return source, URL and bounded, non-sensitive diagnostics for a GIB lookup."""
-    diagnostic = {'article': number, 'html_status': None, 'html_characters': 0,
-                  'html_article_headings': 0, 'pdf_links': 0, 'pdf_checks': [],
-                  'result': 'not_found'}
+    """Try only GIB-hosted pages. Fail closed if the requested provision is missing."""
+    hosts = ('gib.gov.tr', 'antalya.gib.gov.tr', 'karabuk.gib.gov.tr',
+             'bilecik.gib.gov.tr')
+    urls = [f'https://{host}/mevzuat/kanun/436' for host in hosts]
+    # The separate article-30 page is confirmed; do not guess article-29 ID.
+    if number == 30:
+        urls.insert(0, 'https://gib.gov.tr/mevzuat/kanun/436/madde/7903')
+    diagnostic = {'article': number, 'result': 'not_found', 'attempts': []}
     session = requests.Session()
-    session.headers.update({'User-Agent': 'Mozilla/5.0 (compatible; MaliMevzuatAI/3.4)'})
-    try:
-        r = session.get(KDV_OFFICIAL, timeout=(5, 12), allow_redirects=True)
-        diagnostic['html_status'] = r.status_code
-        diagnostic['html_content_type'] = r.headers.get('Content-Type', '').split(';')[0][:60]
-        diagnostic['redirected'] = r.url != KDV_OFFICIAL
-        r.raise_for_status()
-        if len(r.content) > 4_000_000:
-            diagnostic['result'] = 'html_too_large'
-            return None, KDV_OFFICIAL, diagnostic
-        soup = BeautifulSoup(r.content, 'html.parser')
-        candidates = []
-        for tag in soup.select('a[href], iframe[src], embed[src]'):
-            href = tag.get('href') or tag.get('src') or ''
-            link = urljoin(r.url, href)
-            parsed = urlparse(link)
-            if parsed.scheme != 'https' or parsed.hostname not in ('gib.gov.tr', 'www.gib.gov.tr'):
+    session.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
+                            'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'tr-TR,tr;q=0.9'})
+    for url in urls:
+        entry = {'source': url, 'status': None, 'characters': 0, 'result': 'not_found'}
+        diagnostic['attempts'].append(entry)
+        try:
+            r = session.get(url, timeout=(5, 9), allow_redirects=True)
+            entry['status'] = r.status_code
+            r.raise_for_status()
+            if len(r.content) > 6_000_000:
+                entry['result'] = 'too_large'
                 continue
-            if '.pdf' in parsed.path.lower() and link not in candidates:
-                candidates.append(link)
-        diagnostic['pdf_links'] = len(candidates)
-        for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
-            tag.decompose()
-        text = soup.get_text(' ', strip=True)
-        diagnostic['html_characters'] = len(text)
-        diagnostic['html_article_headings'] = len(re.findall(r'(?<!\w)madde\s*' + str(number) + r'\b', text, re.I))
-        found = extract_article(text, number)
-        if found:
-            diagnostic['result'] = 'html_article_found'
-            return found, r.url, diagnostic
-        for url in candidates[:3]:
-            entry = {'http_status': None, 'pages': 0, 'text_characters': 0, 'result': 'not_found'}
-            diagnostic['pdf_checks'].append(entry)
-            try:
-                pdf = session.get(url, timeout=(5, 15))
-                entry['http_status'] = pdf.status_code
-                pdf.raise_for_status()
-                if not pdf.content.startswith(b'%PDF') or len(pdf.content) > 8_000_000:
-                    entry['result'] = 'not_pdf_or_too_large'
-                    continue
-                reader = PdfReader(io.BytesIO(pdf.content), strict=False)
-                entry['pages'] = len(reader.pages)
-                if len(reader.pages) > 350:
-                    entry['result'] = 'too_many_pages'
-                    continue
-                parts = []
-                for page in reader.pages:
-                    parts.append(page.extract_text() or '')
-                pdf_text = ' '.join(parts)
-                entry['text_characters'] = len(pdf_text)
-                found = extract_article(pdf_text, number)
-                if found:
-                    entry['result'] = 'article_found'
-                    diagnostic['result'] = 'pdf_article_found'
-                    return found, url, diagnostic
-            except Exception as exc:
-                entry['result'] = 'read_error_' + type(exc).__name__
-                app.logger.warning('GIB PDF extraction: %s', type(exc).__name__)
-        return None, r.url, diagnostic
-    except requests.RequestException as exc:
-        diagnostic['result'] = 'http_error_' + type(exc).__name__
-        app.logger.warning('GIB source fetch: %s', type(exc).__name__)
-        return None, KDV_OFFICIAL, diagnostic
+            soup = BeautifulSoup(r.content, 'html.parser')
+            for node in soup(['script', 'style', 'nav', 'header', 'footer']):
+                node.decompose()
+            raw = soup.get_text(' ', strip=True)
+            entry['characters'] = len(raw)
+            found = extract_article(raw, number)
+            # For 29/3 questions, an incomplete article cannot be marked verified.
+            if found and number == 29 and not re.search(r'(?<!\d)3\s*[.\-)]\s*.{0,450}?(?:takvim|indir)', found, re.I | re.S):
+                entry['result'] = 'article_29_paragraph_3_missing'
+                continue
+            if found:
+                entry['result'] = 'verified_article_found'
+                diagnostic['result'] = 'verified_article_found'
+                return found, r.url, diagnostic
+            entry['result'] = 'article_not_in_html'
+        except requests.RequestException as exc:
+            entry['result'] = 'request_error_' + type(exc).__name__
+            app.logger.warning('GIB source attempt %s: %s', url, type(exc).__name__)
+    return None, KDV_OFFICIAL, diagnostic
 
 
 @app.post('/api/ask')
@@ -150,7 +122,7 @@ def ask():
     source_text, source_url, diagnostics = official_article(article) if article else (None, None, {'result': 'article_not_supported'})
     app.logger.info('GIB article diagnostics: %s', diagnostics)
     if article and not source_text:
-        return jsonify(answer='RESMÎ METİN DOĞRULANAMADI\n\nGİB sayfası veya bağlı PDF içinden ilgili kanun maddesinin tam metni güvenilir biçimde çıkarılamadı. Bu nedenle madde hakkında tahmini cevap verilmedi. Kaynağı bağlantıdan manuel kontrol edin.', source_url=source_url, verified_source=False, status='unverified', diagnostics=diagnostics)
+        return jsonify(answer='RESMÎ METİN DOĞRULANAMADI\n\nDenendiği halde GİB kaynaklarından ilgili kanun maddesinin tam metni güvenilir biçimde çıkarılamadı. Bu nedenle madde hakkında tahmini cevap verilmedi. Kaynağı bağlantıdan manuel kontrol edin.', source_url=source_url, verified_source=False, status='unverified', diagnostics=diagnostics)
     key = os.environ.get('GEMINI_API_KEY', '').strip()
     if not key:
         return jsonify(answer='GEMINI_API_KEY tanımlanmamış.'), 503
