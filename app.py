@@ -6,12 +6,12 @@ from bs4 import BeautifulSoup
 from flask import Flask,jsonify,request,render_template_string
 
 app=Flask(__name__)
-VERSION='4.3.0'
+VERSION='4.3.2'
 SOURCES={'Vergi Mevzuatı (GİB)':'https://gib.gov.tr/mevzuat/kanun/436','Türk Ticaret Kanunu':'https://www.mevzuat.gov.tr','SPK Mevzuatı':'https://spk.gov.tr','Türkiye Muhasebe Standartları':'https://www.kgk.gov.tr'}
-HTML='''<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mali Mevzuat AI 4.3.0</title><style>body{font-family:system-ui;background:#101827;color:#edf3ff;margin:0;padding:18px}main{max-width:800px;margin:auto}.panel{background:#20344e;padding:20px;border-radius:20px;margin:16px 0}select,textarea,button{font:inherit;box-sizing:border-box;width:100%;padding:13px;border-radius:10px;margin:10px 0}select,textarea{background:#101827;color:white;border:1px solid #64748b}button{background:#2788ec;border:0;color:white;font-weight:700}a{color:#9fd2ff}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit}details{margin-top:14px}.muted{color:#b7c7dc}</style></head><body><main><h1>Mali Mevzuat AI <small>4.3.0</small></h1><p class="muted">Resmî kaynak tarama ve tanılama</p><section class="panel"><label>Kaynak</label><select id="source">{% for name in sources %}<option>{{name}}</option>{% endfor %}</select><label>Soru veya aranacak ifade</label><textarea id="q" rows="4" placeholder="3065 sayılı KDV Kanunu'nun 29/3. maddesine göre KDV indirim süresi nedir?"></textarea><button id="go">Kaynağı Ara ve Yanıtla</button><p id="status" role="status"></p><div id="results"></div><details><summary>Kaynak tanılama bilgileri</summary><pre id="debug"></pre></details></section><section class="panel"><h2>Resmî kaynaklar</h2>{% for name,url in sources.items() %}<p><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{name}}</a></p>{% endfor %}</section></main><script>document.getElementById('go').onclick=async()=>{const s=document.getElementById('status'),out=document.getElementById('results'),dbg=document.getElementById('debug');s.textContent='Kaynak taranıyor...';out.replaceChildren();dbg.textContent='';try{const p=new URLSearchParams({source:document.getElementById('source').value,q:document.getElementById('q').value});const r=await fetch('/api/search?'+p);const d=await r.json();s.textContent=d.message||'İşlem tamamlandı';const a=document.createElement('a');a.href=d.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Resmî kaynak bağlantısını aç';out.append(a);for(const excerpt of d.excerpts||[]){const p=document.createElement('pre');p.textContent=excerpt;out.append(p)}dbg.textContent=JSON.stringify({checked_at:d.checked_at,http_status:d.http_status,content_type:d.content_type,content_length:d.content_length,final_url:d.final_url,detail:d.detail,detected_article:d.detected_article},null,2)}catch(e){s.textContent='İstek başarısız';dbg.textContent=String(e)}};</script></body></html>'''
+HTML='''<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mali Mevzuat AI 4.3.2</title><style>body{font-family:system-ui;background:#101827;color:#edf3ff;margin:0;padding:18px}main{max-width:800px;margin:auto}.panel{background:#20344e;padding:20px;border-radius:20px;margin:16px 0}select,textarea,button{font:inherit;box-sizing:border-box;width:100%;padding:13px;border-radius:10px;margin:10px 0}select,textarea{background:#101827;color:white;border:1px solid #64748b}button{background:#2788ec;border:0;color:white;font-weight:700}a{color:#9fd2ff}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit}details{margin-top:14px}.muted{color:#b7c7dc}</style></head><body><main><h1>Mali Mevzuat AI <small>4.3.2</small></h1><p class="muted">Resmî kaynak tarama ve tanılama</p><section class="panel"><label>Kaynak</label><select id="source">{% for name in sources %}<option>{{name}}</option>{% endfor %}</select><label>Soru veya aranacak ifade</label><textarea id="q" rows="4" placeholder="3065 sayılı KDV Kanunu'nun 29/3. maddesine göre KDV indirim süresi nedir?"></textarea><button id="go">Kaynağı Ara ve Yanıtla</button><p id="status" role="status"></p><div id="results"></div><details><summary>Kaynak tanılama bilgileri</summary><pre id="debug"></pre></details></section><section class="panel"><h2>Resmî kaynaklar</h2>{% for name,url in sources.items() %}<p><a href="{{url}}" target="_blank" rel="noopener noreferrer">{{name}}</a></p>{% endfor %}</section></main><script>document.getElementById('go').onclick=async()=>{const s=document.getElementById('status'),out=document.getElementById('results'),dbg=document.getElementById('debug');s.textContent='Kaynak taranıyor...';out.replaceChildren();dbg.textContent='';try{const p=new URLSearchParams({source:document.getElementById('source').value,q:document.getElementById('q').value});const r=await fetch('/api/search?'+p,{headers:{'Accept':'application/json'}});const raw=await r.text();let d;try{d=JSON.parse(raw)}catch(_){throw new Error('Sunucu JSON yerine HTML/metin döndürdü (HTTP '+r.status+'). Render Logs bölümünü kontrol edin.')}if(!r.ok)throw new Error(d.message||d.error||'HTTP '+r.status);s.textContent=d.message||'İşlem tamamlandı';const a=document.createElement('a');a.href=d.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Resmî kaynak bağlantısını aç';out.append(a);for(const excerpt of d.excerpts||[]){const p=document.createElement('pre');p.textContent=excerpt;out.append(p)}dbg.textContent=JSON.stringify({checked_at:d.checked_at,http_status:d.http_status,content_type:d.content_type,content_length:d.content_length,final_url:d.final_url,detail:d.detail,detected_article:d.detected_article},null,2)}catch(e){s.textContent='İstek başarısız';dbg.textContent=String(e)}};</script></body></html>'''
 
 def fetch_source(url):
-    response=requests.get(url,timeout=(6,18),headers={'User-Agent':'Mozilla/5.0 (compatible; MaliMevzuatAI/4.3.0)','Accept':'text/html,application/pdf;q=0.9,*/*;q=0.5'},allow_redirects=True)
+    response=requests.get(url,timeout=(6,18),headers={'User-Agent':'Mozilla/5.0 (compatible; MaliMevzuatAI/4.3.2)','Accept':'text/html,application/pdf;q=0.9,*/*;q=0.5'},allow_redirects=True)
     response.raise_for_status()
     p=urlparse(response.url)
     allowed={urlparse(u).hostname for u in SOURCES.values()}
@@ -53,12 +53,12 @@ def search():
         except (requests.RequestException,ValueError) as primary_error:
             if name!='Vergi Mevzuatı (GİB)' or not re.search(r'\b(?:3065|kdv|katma\s+değer)\b',q,re.I):raise
             fallback='https://www.yatirimadestek.gov.tr/pdf/assets/upload/dosyalar/3065-sayili-katma-deger-vergisi-kanunu.pdf'
-            response=requests.get(fallback,timeout=(8,35),headers={'User-Agent':'Mozilla/5.0','Accept':'application/pdf'})
+            response=requests.get(fallback,timeout=(5,12),headers={'User-Agent':'Mozilla/5.0','Accept':'application/pdf'})
             response.raise_for_status()
             if not response.content.startswith(b'%PDF') or len(response.content)>12000000:raise ValueError('Resmî yedek PDF doğrulanamadı')
             from pypdf import PdfReader
             reader=PdfReader(io.BytesIO(response.content))
-            content='\n'.join(page.extract_text() or '' for page in reader.pages)
+            content='\n'.join(page.extract_text() or '' for page in reader.pages[:80])
             if len(content)<1000:raise ValueError('Resmî PDF metni çıkarılamadı')
             status=response.status_code;ctype='application/pdf';final=fallback;fallback_used=True
         result['url']=final
@@ -90,8 +90,24 @@ def search():
                     if excerpt not in result['excerpts']:result['excerpts'].append(excerpt)
                 if result['excerpts']:break
         result['message']=(f"{len(result['excerpts'])} metin eşleşmesi bulundu. Resmî kaynak üzerinden doğrulayın." if result['excerpts'] else 'İlgili madde doğrulanamadı. Resmî kaynaktan kontrol edin.')
-    except (requests.RequestException,ValueError,Exception) as exc:
+    except Exception as exc:
+        app.logger.exception('Source retrieval failed')
         result.update(message='Resmî metin otomatik okunamadı; doğrulanmamış hüküm üretilmedi.',detail=f'{type(exc).__name__}: {exc}')
     return jsonify(result)
+
+@app.errorhandler(404)
+def not_found(exc):
+    if request.path.startswith('/api/'):
+        return jsonify(message='API adresi bulunamadı',version=VERSION),404
+    return 'Sayfa bulunamadı',404
+
+@app.errorhandler(405)
+def method_not_allowed(exc):
+    return jsonify(message='Bu API isteği desteklenmiyor',version=VERSION),405
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(exc):
+    app.logger.exception('Unhandled application error')
+    return jsonify(message='Sunucu işlemi tamamlayamadı. Render Logs bölümünü kontrol edin.',detail=type(exc).__name__,version=VERSION),500
 
 if __name__=='__main__':app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)))
